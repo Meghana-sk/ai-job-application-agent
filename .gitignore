@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Candidate-private data
+config/preferences.yaml
+data/
+resume/
+private/
+applications/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

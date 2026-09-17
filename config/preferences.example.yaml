@@ -1,0 +1,32 @@
+# Public-safe template.
+# Copy to config/preferences.yaml locally. Do not commit the private copy.
+
+target_roles:
+  - Senior Frontend
+  - SDE III
+  - Staff Frontend
+  - Senior Full Stack
+
+locations:
+  - Bengaluru
+
+work_modes:
+  - hybrid
+  - onsite
+
+preferred_skills:
+  - React
+  - TypeScript
+  - JavaScript
+  - Next.js
+  - frontend architecture
+  - frontend performance
+  - real-time systems
+  - MQTT
+  - AI engineering
+  - agentic engineering
+
+minimum_compensation_inr: ${MIN_COMPENSATION_INR}
+
+daily_application_limit: 10
+require_approval_before_submission: true
