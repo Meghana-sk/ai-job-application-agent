@@ -41,7 +41,7 @@ def run() -> None:
         for job in jobs:
             evaluation = evaluate(job, config["minimum_compensation_inr"])
             application_id = f"{job.provider}:{job.provider_job_id}"
-            store.add_application({
+            inserted = store.add_application({
                 "application_id": application_id,
                 "job_id": job.provider_job_id,
                 "company": job.company,
@@ -62,6 +62,10 @@ def run() -> None:
                 "first_seen_at": run_started_at.isoformat(),
                 "last_updated_at": run_started_at.isoformat(),
             })
+
+            if not inserted:
+                continue
+
             store.record_status(application_id, "discovered")
             if evaluation["eligible"]:
                 store.record_status(application_id, "matched")
