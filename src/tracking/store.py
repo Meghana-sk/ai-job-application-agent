@@ -77,11 +77,20 @@ class ApplicationStore:
         )
         self.connection.execute(
             "INSERT INTO application_events (application_id, status, timestamp) VALUES (?, ?, ?)",
-            (record["application_id"], application.get("status", ApplicationStatus.DISCOVERED.value), now),
+            (
+                record["application_id"],
+                application.get("status", ApplicationStatus.DISCOVERED.value),
+                now,
+            ),
         )
         self.connection.commit()
 
-    def record_status(self, application_id: str, status: ApplicationStatus | str, details: str | None = None) -> None:
+    def record_status(
+        self,
+        application_id: str,
+        status: ApplicationStatus | str,
+        details: str | None = None,
+    ) -> None:
         value = status.value if isinstance(status, ApplicationStatus) else status
         now = utc_now()
         self.connection.execute(
@@ -95,10 +104,37 @@ class ApplicationStore:
             (value, now, value, now, value, now, application_id),
         )
         self.connection.execute(
-            "INSERT INTO application_events (application_id, status, timestamp, details) VALUES (?, ?, ?, ?)",
+            """
+            INSERT INTO application_events (application_id, status, timestamp, details)
+            VALUES (?, ?, ?, ?)
+            """,
             (application_id, value, now, details),
         )
         self.connection.commit()
+
+    def metrics_since(self, since: str) -> dict[str, int]:
+        """Return current-run metrics based on status events after the supplied timestamp."""
+        row = self.connection.execute(
+            """
+            SELECT
+                COUNT(DISTINCT CASE WHEN status = 'discovered' THEN application_id END),
+                COUNT(DISTINCT CASE WHEN status = 'matched' THEN application_id END),
+                COUNT(DISTINCT CASE WHEN status = 'prepared' THEN application_id END),
+                COUNT(DISTINCT CASE WHEN status = 'submitted' THEN application_id END),
+                COUNT(DISTINCT CASE WHEN status = 'failed' THEN application_id END)
+            FROM application_events
+            WHERE timestamp >= ?
+            """,
+            (since,),
+        ).fetchone()
+
+        return {
+            "jobs_found": int(row[0] or 0),
+            "matching_jobs": int(row[1] or 0),
+            "applications_prepared": int(row[2] or 0),
+            "applications_submitted": int(row[3] or 0),
+            "errors": int(row[4] or 0),
+        }
 
     def close(self) -> None:
         self.connection.close()
