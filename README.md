@@ -62,6 +62,42 @@ Other supported states are `rejected`, `withdrawn`, `closed`, `failed`, `skipped
 
 The tracker must never store passwords, cookies, auth tokens, CAPTCHA answers, MFA codes, payment information, or unnecessary personal data.
 
+## Application history persistence
+
+Application history is **not committed to this public repository**.
+
+The daily workflow keeps the SQLite tracker on the GitHub Actions runner while it runs, then encrypts the database with AES-256-CBC + PBKDF2 and stores only the encrypted file as a GitHub Actions artifact named `application-history`. On the next run, the workflow retrieves the latest artifact and decrypts it before running the agent.
+
+This design means the public repository contains no plaintext application history, resume data, contact information, or compensation target. The encryption key is stored only as the GitHub Actions repository secret `APPLICATION_HISTORY_KEY`.
+
+The workflow uses a concurrency lock so two runs cannot update the same history at the same time.
+
+### One-time setup
+
+Generate a random key locally:
+
+```bash
+openssl rand -hex 32
+```
+
+Then add the generated value at:
+
+**Repository → Settings → Secrets and variables → Actions → New repository secret**
+
+Name:
+
+```text
+APPLICATION_HISTORY_KEY
+```
+
+Never commit or paste the key into the repository.
+
+### Persistence limitation
+
+Because this is a public repository, GitHub's artifact retention limit is currently up to 90 days. The workflow overwrites the named artifact on each successful run, refreshing its retention window. If the workflow does not run for longer than the retention period, the stored history can expire.
+
+For long-term retention independent of GitHub Actions artifact retention, the next upgrade would be a dedicated private database/object store.
+
 ## Current scope
 
 This repository provides the search, matching, scoring, personalization, duplicate-detection, tracking, and safety architecture.
