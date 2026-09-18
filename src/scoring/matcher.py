@@ -1,0 +1,26 @@
+from __future__ import annotations
+import re
+from src.matching.matcher import match_skills
+from src.matching.profile import candidate_skills, role_keywords
+from src.search.providers import ProviderJob
+
+def _is_bengaluru(location: str) -> bool:
+    value = location.casefold()
+    return "bengaluru" in value or "bangalore" in value
+
+def _compensation_inr(description: str) -> int | None:
+    text = description.replace(",", "")
+    matches = re.findall(r"(?:₹|rs\.?|inr\s*)(\d+(?:\.\d+)?)\s*(?:lpa|lakh|lakhs)", text, re.I)
+    return int(max(float(x) for x in matches) * 100000) if matches else None
+
+def evaluate(job: ProviderJob, minimum_compensation_inr: int) -> dict:
+    title, description = job.title.casefold(), job.description.casefold()
+    role_match = any(k in title for k in role_keywords())
+    skills = candidate_skills()
+    mentioned = [s for s in skills if s.casefold() in description or s.casefold() in title]
+    skill_result = match_skills(mentioned, skills)
+    compensation = _compensation_inr(job.description)
+    compensation_ok = compensation is not None and compensation >= minimum_compensation_inr
+    location_ok = _is_bengaluru(job.location) or (job.work_mode or "").casefold() == "remote"
+    score = (30 if role_match else 0) + min(30, len(skill_result["matched"]) * 5) + (20 if location_ok else 0) + (20 if compensation_ok else 0)
+    return {"role_match": role_match,"matched_skills":skill_result["matched"],"missing_skills":skill_result["missing"],"compensation_value_inr":compensation,"compensation_disclosed":compensation is not None,"compensation_ok":compensation_ok,"location_ok":location_ok,"score":score,"eligible":role_match and location_ok and compensation_ok}
