@@ -5,8 +5,13 @@ on:
     - cron: "30 3 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: daily-job-search
+  cancel-in-progress: false
+
 permissions:
   contents: read
+  actions: read
 
 jobs:
   discover:
@@ -20,6 +25,41 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Validate private history key
+        env:
+          APPLICATION_HISTORY_KEY: ${{ secrets.APPLICATION_HISTORY_KEY }}
+        run: |
+          if [ -z "$APPLICATION_HISTORY_KEY" ]; then
+            echo "::error::Missing APPLICATION_HISTORY_KEY repository secret."
+            echo "Create a random key locally and add it as a GitHub Actions repository secret."
+            exit 1
+          fi
+
+      - name: Restore encrypted application history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION_HISTORY_KEY: ${{ secrets.APPLICATION_HISTORY_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p .runtime data
+
+          ARTIFACT_ID=$(gh api             "/repos/$GITHUB_REPOSITORY/actions/artifacts?name=application-history&per_page=100"             --jq '.artifacts | sort_by(.created_at) | last | .id // empty')
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No previous application history artifact found. Starting a new private tracker."
+            exit 0
+          fi
+
+          echo "Restoring latest encrypted application history."
+          gh api             --output .runtime/history.zip             "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
+
+          unzip -q .runtime/history.zip -d .runtime/history
+          test -f .runtime/history/application-history.enc
+
+          openssl enc -d -aes-256-cbc -pbkdf2             -in .runtime/history/application-history.enc             -out data/applications.sqlite3             -pass env:APPLICATION_HISTORY_KEY
+
+          chmod 600 data/applications.sqlite3
 
       - name: Run safe discovery pipeline
         id: discovery
@@ -62,5 +102,29 @@ jobs:
             echo "| Applications submitted | $SUBMITTED |"
             echo "| Errors | $ERRORS |"
             echo ""
-            echo "> Tracker data is kept on the workflow runner and is not committed to the public repository."
+            echo "> Application history is encrypted before it is stored as a workflow artifact."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Persist encrypted application history
+        if: always() && hashFiles('data/applications.sqlite3') != ''
+        env:
+          APPLICATION_HISTORY_KEY: ${{ secrets.APPLICATION_HISTORY_KEY }}
+        run: |
+          set -euo pipefail
+          rm -rf .runtime/history-out
+          mkdir -p .runtime/history-out
+
+          openssl enc -aes-256-cbc -pbkdf2             -salt             -in data/applications.sqlite3             -out .runtime/history-out/application-history.enc             -pass env:APPLICATION_HISTORY_KEY
+
+          chmod 600 .runtime/history-out/application-history.enc
+          rm -f data/applications.sqlite3
+
+      - name: Upload encrypted application history
+        if: always() && hashFiles('.runtime/history-out/application-history.enc') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-history
+          path: .runtime/history-out/application-history.enc
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true
