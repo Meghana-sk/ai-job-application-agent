@@ -9,6 +9,7 @@ An AI-assisted job discovery and application workflow for software engineering r
 - Uses transparent, configurable matching criteria.
 - Generates truthful, tailored application material.
 - Detects duplicate jobs and applications.
+- Tracks application lifecycle and status history in a private local SQLite database.
 - Supports a daily GitHub Actions workflow.
 - Keeps sensitive candidate preferences outside the public repository.
 
@@ -24,20 +25,46 @@ Do **not** commit:
 
 Use GitHub Actions Secrets or a private local `.env` file for sensitive values.
 
+The application tracker database is created under `data/`, which is gitignored.
+
 ## Project structure
 
 ```text
 skills/                  Agent behavior specifications
 config/                  Safe example configuration
 src/                     Python implementation
+  tracking/              Private application tracker schema/store
 .github/workflows/       Scheduled workflow
 .env.example             Environment variable template
 .gitignore               Privacy and secret protection
 ```
 
+## Application tracker
+
+The tracker keeps one record per unique job opportunity and a separate status-event history.
+
+### Core fields
+
+- Job identity: `application_id`, `job_id`, `company`, `role`, `location`, `work_mode`, `application_url`, `source`
+- Matching: `role_match`, `matched_skills`, `missing_skills`, `match_score`, compensation metadata
+- Automation: `status`, `discovered_at`, `prepared_at`, `submitted_at`, `submission_reference`
+- Deduplication: `first_seen_at`, `last_updated_at`, `duplicate_of`
+- Failure: `error_code`, `error_message`
+- Audit: `application_events`
+
+### Status lifecycle
+
+Typical lifecycle:
+
+`discovered → matched → prepared → awaiting_approval → submitted`
+
+Other supported states are `rejected`, `withdrawn`, `closed`, `failed`, `skipped`, and `duplicate`.
+
+The tracker must never store passwords, cookies, auth tokens, CAPTCHA answers, MFA codes, payment information, or unnecessary personal data.
+
 ## Current scope
 
-This repository provides the search, matching, scoring, personalization, duplicate-detection, and safety architecture.
+This repository provides the search, matching, scoring, personalization, duplicate-detection, tracking, and safety architecture.
 
 Actual job-board integrations should be added through APIs or authorized workflows. The agent must not bypass CAPTCHA, MFA, access controls, application safeguards, or site terms.
 
