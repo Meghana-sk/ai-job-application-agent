@@ -10,3 +10,6 @@ class ApplicationStatus(StrEnum):
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
     CLOSED = "closed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    DUPLICATE = "duplicate"
