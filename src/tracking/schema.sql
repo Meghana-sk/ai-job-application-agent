@@ -7,20 +7,20 @@ CREATE TABLE IF NOT EXISTS applications (
     work_mode TEXT,
     application_url TEXT,
     source TEXT,
-    discovered_at TEXT NOT NULL,
-    role_match INTEGER,
-    matched_skills TEXT,
-    missing_skills TEXT,
-    match_score REAL,
-    compensation_value_inr INTEGER,
+    discovered_at TIMESTAMPTZ NOT NULL,
+    role_match BOOLEAN,
+    matched_skills JSONB NOT NULL DEFAULT '[]'::jsonb,
+    missing_skills JSONB NOT NULL DEFAULT '[]'::jsonb,
+    match_score DOUBLE PRECISION,
+    compensation_value_inr BIGINT,
     compensation_currency TEXT,
-    compensation_disclosed INTEGER DEFAULT 0,
+    compensation_disclosed BOOLEAN NOT NULL DEFAULT FALSE,
     status TEXT NOT NULL,
-    prepared_at TEXT,
-    submitted_at TEXT,
+    prepared_at TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
     submission_reference TEXT,
-    first_seen_at TEXT NOT NULL,
-    last_updated_at TEXT NOT NULL,
+    first_seen_at TIMESTAMPTZ NOT NULL,
+    last_updated_at TIMESTAMPTZ NOT NULL,
     duplicate_of TEXT,
     error_code TEXT,
     error_message TEXT,
@@ -32,13 +32,15 @@ CREATE INDEX IF NOT EXISTS idx_applications_job_id ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_submitted_at ON applications(submitted_at);
 
 CREATE TABLE IF NOT EXISTS application_events (
-    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    application_id TEXT NOT NULL,
+    event_id BIGSERIAL PRIMARY KEY,
+    application_id TEXT NOT NULL REFERENCES applications(application_id) ON DELETE CASCADE,
     status TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    details TEXT,
-    FOREIGN KEY(application_id) REFERENCES applications(application_id)
+    timestamp TIMESTAMPTZ NOT NULL,
+    details TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_application_events_application_id
 ON application_events(application_id);
+
+CREATE INDEX IF NOT EXISTS idx_application_events_timestamp
+ON application_events(timestamp);
