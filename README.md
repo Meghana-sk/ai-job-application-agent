@@ -62,49 +62,62 @@ Other supported states are `rejected`, `withdrawn`, `closed`, `failed`, `skipped
 
 The tracker must never store passwords, cookies, auth tokens, CAPTCHA answers, MFA codes, payment information, or unnecessary personal data.
 
-## Application history persistence
+## Private PostgreSQL persistence
 
 Application history is **not committed to this public repository**.
 
-The daily workflow keeps the SQLite tracker on the GitHub Actions runner while it runs, then encrypts the database with AES-256-CBC + PBKDF2 and stores only the encrypted file as a GitHub Actions artifact named `application-history`. On the next run, the workflow retrieves the latest artifact and decrypts it before running the agent.
+The daily workflow uses the Supabase PostgreSQL project as the persistent source of truth. The schema lives in `src/tracking/schema.sql`, with application records and status-event history.
 
-This design means the public repository contains no plaintext application history, resume data, contact information, or compensation target. The encryption key is stored only as the GitHub Actions repository secret `APPLICATION_HISTORY_KEY`.
+The GitHub Actions runner receives the database connection only through the private `APPLICATION_DATABASE_URL` repository secret.
 
-The workflow uses a concurrency lock so two runs cannot update the same history at the same time.
+For GitHub Actions, use the Supabase **Session pooler** connection string on port 5432. Supabase documents the shared session pooler as the IPv4-compatible option for IPv4-only environments such as GitHub Actions.
 
-### One-time setup
+### Required secrets
 
-Generate a random key locally:
-
-```bash
-openssl rand -hex 32
-```
-
-Then add the generated value at:
-
-**Repository → Settings → Secrets and variables → Actions → New repository secret**
-
-Name:
+Add:
 
 ```text
-APPLICATION_HISTORY_KEY
+APPLICATION_DATABASE_URL
+MIN_COMPENSATION_INR
 ```
 
-Never commit or paste the key into the repository.
+Optional controls:
 
-### Persistence limitation
+```text
+JOB_SEARCH_ENABLED
+JOB_SEARCH_MAX_RESULTS
+JOB_PROVIDER_BOARDS
+CANDIDATE_SKILLS
+```
 
-Because this is a public repository, GitHub's artifact retention limit is currently up to 90 days. The workflow overwrites the named artifact on each successful run, refreshing its retention window. If the workflow does not run for longer than the retention period, the stored history can expire.
+The compensation threshold is intentionally not present anywhere in the public repository.
 
-For long-term retention independent of GitHub Actions artifact retention, the next upgrade would be a dedicated private database/object store.
+## Live ATS discovery
 
-## Current scope
+The agent now supports public Greenhouse and Lever job feeds.
 
-This repository provides the search, matching, scoring, personalization, duplicate-detection, tracking, and safety architecture.
+Default provider boards are configured for several public ATS sites and can be overridden with `JOB_PROVIDER_BOARDS` as JSON:
 
-Actual job-board integrations should be added through APIs or authorized workflows. The agent must not bypass CAPTCHA, MFA, access controls, application safeguards, or site terms.
+```json
+{"greenhouse":["monks"],"lever":["acceldata","hevodata","brillio-2","everbridge","weekdayworks"]}
+```
 
-Application submission should remain approval-gated unless an authorized integration explicitly permits automated submission.
+The pipeline normalizes postings, filters for Bengaluru/Bangalore or remote roles, evaluates target seniority and technical alignment, and records the result in PostgreSQL.
+
+## Application preparation and submission
+
+The daily run now:
+
+1. discovers live postings;
+2. evaluates role, location, skills, and compensation;
+3. records each opportunity;
+4. prepares matched applications with the direct application URL;
+5. marks prepared applications as `awaiting_approval`;
+6. reports the run metrics.
+
+It does **not** silently submit applications. Actual submission can require personal contact data, resume upload, employer-specific questions, authentication, CAPTCHA, MFA, or other safeguards. The agent must never bypass those controls.
+
+A future authorized submission adapter can submit only when the required data and explicit approval are available.
 
 ## Running locally
 
