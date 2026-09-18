@@ -22,7 +22,45 @@ jobs:
           python-version: "3.12"
 
       - name: Run safe discovery pipeline
+        id: discovery
         env:
           JOB_SEARCH_ENABLED: ${{ secrets.JOB_SEARCH_ENABLED }}
           JOB_SEARCH_MAX_RESULTS: ${{ secrets.JOB_SEARCH_MAX_RESULTS }}
         run: python -m src.main
+
+      - name: Write daily job summary
+        if: always()
+        env:
+          DISCOVERY_OUTCOME: ${{ steps.discovery.outcome }}
+        run: |
+          if [ -f data/run-metrics.json ]; then
+            JOBS_FOUND=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['jobs_found'])")
+            MATCHING_JOBS=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['matching_jobs'])")
+            PREPARED=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['applications_prepared'])")
+            SUBMITTED=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['applications_submitted'])")
+            ERRORS=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['errors'])")
+          else
+            JOBS_FOUND=0
+            MATCHING_JOBS=0
+            PREPARED=0
+            SUBMITTED=0
+            ERRORS=1
+          fi
+
+          if [ "$DISCOVERY_OUTCOME" != "success" ]; then
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          {
+            echo "## AI Job Agent — Daily Summary"
+            echo ""
+            echo "| Metric | Count |"
+            echo "|---|---:|"
+            echo "| Jobs found | $JOBS_FOUND |"
+            echo "| Matching jobs | $MATCHING_JOBS |"
+            echo "| Applications prepared | $PREPARED |"
+            echo "| Applications submitted | $SUBMITTED |"
+            echo "| Errors | $ERRORS |"
+            echo ""
+            echo "> Tracker data is kept on the workflow runner and is not committed to the public repository."
+          } >> "$GITHUB_STEP_SUMMARY"
