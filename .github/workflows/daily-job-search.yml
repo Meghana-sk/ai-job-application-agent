@@ -36,15 +36,6 @@ jobs:
             exit 1
           fi
 
-      - name: Validate private matching configuration
-        env:
-          MIN_COMPENSATION_INR: ${{ secrets.MIN_COMPENSATION_INR }}
-        run: |
-          if [ -z "$MIN_COMPENSATION_INR" ]; then
-            echo "::error::Missing MIN_COMPENSATION_INR repository secret."
-            exit 1
-          fi
-
       - name: Run safe discovery pipeline
         id: discovery
         env:
@@ -67,11 +58,7 @@ jobs:
             SUBMITTED=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['applications_submitted'])")
             ERRORS=$(python -c "import json; print(json.load(open('data/run-metrics.json'))['errors'])")
           else
-            JOBS_FOUND=0
-            MATCHING_JOBS=0
-            PREPARED=0
-            SUBMITTED=0
-            ERRORS=1
+            JOBS_FOUND=0; MATCHING_JOBS=0; PREPARED=0; SUBMITTED=0; ERRORS=1
           fi
           if [ "$DISCOVERY_OUTCOME" != "success" ]; then ERRORS=$((ERRORS + 1)); fi
           {
@@ -85,5 +72,6 @@ jobs:
             echo "| Applications submitted | $SUBMITTED |"
             echo "| Errors | $ERRORS |"
             echo ""
-            echo "> Application history is stored in the private PostgreSQL database."
+            echo "> Candidate profile is loaded privately from Supabase; no profile answers are stored in Git."
+            echo "> External application submission remains approval-gated."
           } >> "$GITHUB_STEP_SUMMARY"
