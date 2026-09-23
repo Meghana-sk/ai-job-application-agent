@@ -44,3 +44,13 @@ ON application_events(application_id);
 
 CREATE INDEX IF NOT EXISTS idx_application_events_timestamp
 ON application_events(timestamp);
+
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS approval_token TEXT;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS browser_session_id TEXT;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS submission_stage TEXT;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS submission_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS last_submission_at TIMESTAMPTZ;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS failure_category TEXT;
+CREATE INDEX IF NOT EXISTS idx_applications_approval_token ON applications(approval_token);
+CREATE INDEX IF NOT EXISTS idx_applications_failure_category ON applications(failure_category);
